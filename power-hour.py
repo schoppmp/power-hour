@@ -1,5 +1,7 @@
 import os
 import subprocess
+from joblib import Parallel, delayed
+import multiprocessing
 
 
 def get_video_filename(yt_id, path='.'):
@@ -72,6 +74,8 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
         ]
     args += [
         '-c:v', 'libx264',
+	'-vf', 'scale=1280:720',
+	'-vf', 'fps=fps=30',
         '-t', '60',
         '-y',
         os.path.join('cut', filename)
@@ -81,11 +85,13 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
 
 def cut_all(separator_track):
     '''creates cut versions of all index tracks'''
+    args = []
     for yt_url, timestamp in get_index():
         if not get_video_filename(get_yt_id(yt_url), 'cut'):
             filename = get_video_filename(get_yt_id(yt_url))
-            print('cutting', yt_url)
-            call_ffmpeg_cut(filename, timestamp, separator_track)
+            args += [(filename, timestamp, separator_track)]
+    num_cores = multiprocessing.cpu_count()
+    results = Parallel(n_jobs=num_cores)(delayed(call_ffmpeg_cut)(*arg) for arg in args)
 
 
 def call_ffmpeg_concat(filename_in, filename_out):
@@ -93,7 +99,6 @@ def call_ffmpeg_concat(filename_in, filename_out):
     args = [
 	'ffmpeg',
         '-f', 'concat',
-        '-safe', '0',
         '-i', filename_in,
         '-c', 'copy',
         '-y',
@@ -102,11 +107,34 @@ def call_ffmpeg_concat(filename_in, filename_out):
     subprocess.check_output(args)
 
 
+def get_bpm(filename):
+    '''returns the BPM of the audio track in the given file.'''
+    args = [
+        'ffmpeg',
+        '-i', filename,
+        '-y',
+        'tmp.wav'
+    ]
+    subprocess.check_output(args)
+    args = [
+        'soundstretch',
+        'tmp.wav',
+        '-bpm'
+    ]
+    output =  subprocess.check_output(args, stderr=subprocess.STDOUT)
+    for line in output.splitlines():
+        if line.startswith(b"Detected"):
+            bpm = float(line.split(b' ')[-1])
+            print(filename, bpm, "BPM")
+            return bpm
+    raise RuntimeError("BPM not detected")
+
+
 def create_mix(filename):
     '''writes playlist.txt and concatenates mix with cut tracks and separator_track'''
     with open('playlist.txt', 'w') as f:
-        for basename in os.listdir('cut'):
-            path = os.path.join('cut', basename)
+        files = [os.path.join('cut', basename) for basename in os.listdir('cut')]
+        for path in sorted(files, key=get_bpm):
             if not os.path.isfile(path):
                 continue
             f.write("file '%s'\n" % path)
