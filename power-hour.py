@@ -66,7 +66,7 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
     ]
     if separator_track is not None:
         args += [
-	    '-i', 'airhorn_delayed.m4a',
+	    '-i', separator_track,
 	    '-filter_complex', 'amix=inputs=2:duration=longest',
             '-c:a', 'aac',
         ]
@@ -123,5 +123,5 @@ if __name__ == '__main__':
         exit('missing index.txt')
 
     download_all()
-    cut_all('airhorn.m4a')
+    cut_all('airhorn_delayed.m4a')
     create_mix('POWERHOUR.mp4')
