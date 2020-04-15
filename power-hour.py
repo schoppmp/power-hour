@@ -21,20 +21,16 @@ def get_yt_id(yt_url):
 
 
 def call_yt_dl(yt_url):
-    '''downloads m4a to working dir'''
+    '''downloads video to working dir'''
     args = [
         'youtube-dl',
-        '-f', 'best[height<=720]', 
-	'--id',
+        # Load best video and audio separately and mux them together.
+        '-f', 'bestvideo[height<=720]+bestaudio',
+	'--id',  # Set filename to only the ID.
         yt_url
     ]
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
-
-    # fix filename
-    filename = get_video_filename(get_yt_id(yt_url))
-    if "'" in filename:
-        os.rename(filename, filename.replace("'", ""))
 
 
 def get_index(filename='index.txt'):
@@ -68,9 +64,10 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
     ]
     if separator_track is not None:
         args += [
-	    '-i', 'airhorn_delayed.m4a',
+	    '-i', separator_track,
 	    '-filter_complex', 'amix=inputs=2:duration=longest',
-            '-c:a', 'aac',
+            '-c:a', 'libopus',
+            '-b:a', '128k',
         ]
     args += [
         '-c:v', 'libx264',
@@ -78,7 +75,7 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
 	'-vf', 'fps=fps=30',
         '-t', '60',
         '-y',
-        os.path.join('cut', filename)
+        os.path.join('cut',  os.path.splitext(filename)[0] + ".mkv")
     ]
     subprocess.check_output(args)
 
@@ -151,5 +148,5 @@ if __name__ == '__main__':
         exit('missing index.txt')
 
     download_all()
-    cut_all('airhorn.m4a')
-    create_mix('POWERHOUR.mp4')
+    cut_all('airhorn_delayed.m4a')
+    create_mix('POWERHOUR.mkv')
