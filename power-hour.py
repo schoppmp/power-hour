@@ -71,8 +71,8 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
         ]
     args += [
         '-c:v', 'libx264',
-	'-vf', 'scale=1280:720',
-	'-vf', 'fps=fps=30',
+        '-s', '1280:720',
+        '-vf', 'fps=fps=30',
         '-t', '60',
         '-y',
         os.path.join('cut',  os.path.splitext(filename)[0] + ".mkv")
