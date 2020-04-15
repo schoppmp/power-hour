@@ -3,6 +3,14 @@ import subprocess
 from joblib import Parallel, delayed
 import multiprocessing
 
+def call_and_check_errors(args):
+    '''creates a new process with the given argument and only prints the output if the exit status is non-zero'''
+    try:
+        subprocess.check_output(args, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        print(e.output.decode(sys.getfilesystemencoding()))
+        raise e
+
 
 def get_video_filename(yt_id, path='.'):
     '''checks occurance in working dir or path and returns filename'''
@@ -29,8 +37,8 @@ def call_yt_dl(yt_url):
 	'--id',  # Set filename to only the ID.
         yt_url
     ]
-    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
+    print('downloading', yt_url)
+    call_and_check_errors(args)
 
 
 def get_index(filename='index.txt'):
@@ -49,10 +57,12 @@ def get_index(filename='index.txt'):
 
 def download_all():
     '''downloads new tracks from index to working dir'''
+    args = []
     for yt_url, _ in get_index():
         if not get_video_filename(get_yt_id(yt_url)):
-            print('downloading', yt_url)
-            call_yt_dl(yt_url)
+            args += [yt_url]
+    num_jobs = 4
+    Parallel(n_jobs=num_jobs)(delayed(call_yt_dl)(url) for url in args)
 
 
 def call_ffmpeg_cut(filename, timestamp, separator_track=None):
@@ -77,7 +87,8 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
         '-y',
         os.path.join('cut',  os.path.splitext(filename)[0] + ".mkv")
     ]
-    subprocess.check_output(args)
+    print("cutting {} at {}".format(filename, timestamp))
+    call_and_check_errors(args)
 
 
 def cut_all(separator_track):
@@ -87,8 +98,8 @@ def cut_all(separator_track):
         if not get_video_filename(get_yt_id(yt_url), 'cut'):
             filename = get_video_filename(get_yt_id(yt_url))
             args += [(filename, timestamp, separator_track)]
-    num_cores = multiprocessing.cpu_count()
-    results = Parallel(n_jobs=num_cores)(delayed(call_ffmpeg_cut)(*arg) for arg in args)
+    num_jobs = 2  # ffmpeg already is quite parallelized.
+    Parallel(n_jobs=num_jobs)(delayed(call_ffmpeg_cut)(*arg) for arg in args)
 
 
 def call_ffmpeg_concat(filename_in, filename_out):
@@ -101,7 +112,7 @@ def call_ffmpeg_concat(filename_in, filename_out):
         '-y',
         filename_out
     ]
-    subprocess.check_output(args)
+    call_and_check_errors(args)
 
 
 def get_bpm(filename):
@@ -112,7 +123,7 @@ def get_bpm(filename):
         '-y',
         'tmp.wav'
     ]
-    subprocess.check_output(args)
+    call_and_check_errors(args)
     args = [
         'soundstretch',
         'tmp.wav',
@@ -122,7 +133,7 @@ def get_bpm(filename):
     for line in output.splitlines():
         if line.startswith(b"Detected"):
             bpm = float(line.split(b' ')[-1])
-            print(filename, bpm, "BPM")
+            print("{} has {} BPM".format(filename, bpm))
             return bpm
     raise RuntimeError("BPM not detected")
 
