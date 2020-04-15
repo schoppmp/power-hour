@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 from joblib import Parallel, delayed
 import multiprocessing
@@ -141,7 +142,7 @@ def get_bpm(filename):
 def create_mix(filename):
     '''writes playlist.txt and concatenates mix with cut tracks and separator_track'''
     with open('playlist.txt', 'w') as f:
-        files = [os.path.join('cut', basename) for basename in os.listdir('cut')]
+        files = [os.path.join('cut', get_video_filename(get_yt_id(yt_url), 'cut')) for yt_url, _ in get_index()]
         for path in sorted(files, key=get_bpm):
             if not os.path.isfile(path):
                 continue
