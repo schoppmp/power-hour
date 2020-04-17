@@ -82,6 +82,8 @@ def call_ffmpeg_cut(filename, timestamp, separator_track=None):
         ]
     args += [
         '-c:v', 'libx264',
+        '-crf', '26',
+        '-maxrate', '1.5M',
         '-s', '1280:720',
         '-vf', 'fps=fps=30',
         '-t', '60',
